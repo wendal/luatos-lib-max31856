@@ -3,47 +3,43 @@ wifi定位演示
 ]]
 
 -- LuaTools需要PROJECT和VERSION这两个信息
-PROJECT = "zstructdemo"
+PROJECT = "max31856demo"
 VERSION = "1.0.0"
 
 log.info("main", PROJECT, VERSION)
 
 -- 一定要添加sys.lua !!!!
 sys = require("sys")
-zstruct = require("zstruct")
+max31856 = require("max31856")
 
 -- 用户代码已开始---------------------------------------------
 
 sys.taskInit(function()
-
-    -- 方式1逐段生成结构体
-    local mytd = zstruct.typedef()
-    log.info(">>", mytd.add)
-    mytd:add("int32_t", "id")
-    mytd:add("int8_t flags")
-    mytd:add("uint8_t data[10]")
-    -- 生成不变变的结构体声明, 可用于后续操作
-    local myst = mytd:build()
-
-    -- 打印总大小
-    log.info("myst", "结构体总大小", zstruct.sizeof(myst))
-    log.info("myst", "结构体形式表达", "\n" .. zstruct.metastr(myst))
-
-    myst.id = 0x11A3A5A7
-    myst.flags = 0x02
-    myst.data[0] = 0x30
-    myst.data[8] = 0x38
-
-
-    local raw = zstruct.raw(myst):toStr() -- raw的返回值是zbuff对象
-
-    log.info("myst", string.format("id 0x%08X flags 0x%02X", myst.id, myst.flags))
-    log.info("myst", raw:toHex())
-
-    myst = mytd:build(raw)
-    log.info("myst", string.format("id 0x%08X flags 0x%02X", myst.id, myst.flags))
-    log.info("myst", "data[0]", myst.data[0], "data[8]", myst.data[8])
-
+    local spiId = 0 -- 按实际情况选取SPI总线
+    spi.setup(
+            spiId,--串口id
+            nil, -- 不要传CS脚
+            0,--CPHA
+            0,--CPOL
+            8,--数据宽度
+            20 * 1000000 --频率
+        )
+    
+    sys.taskInit(function()
+        local cs = 10 -- CS脚
+        gpio.setup(cs, 1, gpio.PULLUP)
+        while true do
+            -- 首先, 触发一次测量
+            max31856.tri(spiId, cs)
+            -- 等待测量完成, 大概200ms
+            sys.wait(200)
+            -- 读取温度
+            local temp = max31856.temp(spiId, cs)
+            log.info("max31856", temp)
+    
+            sys.wait(800) -- 累计1秒后,继续测量
+        end
+    end)
 end)
 
 -- 用户代码已结束---------------------------------------------
